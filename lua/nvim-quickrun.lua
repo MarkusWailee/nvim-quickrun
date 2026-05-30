@@ -4,7 +4,6 @@ local m =
     {
         enabled = true,
         path = ".neo/run.lua",
-        key = {{"n", "t", "i"}, "<C-b>"},
     }
 }
 

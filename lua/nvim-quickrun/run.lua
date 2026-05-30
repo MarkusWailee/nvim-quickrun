@@ -6,33 +6,23 @@
 ```
 ]]
 local m = {}
-local h = require("nvim-quickrun.file_helpers")
+local file = require("nvim-quickrun.file_helpers")
 local run_path = require("nvim-quickrun").get_run_path()
 local key = require("nvim-quickrun").opts.key
 
 -- returns true if command exists, false otherwise
 
-local selected = "current"
-
 
 function m.get_table()
-    return h.read(run_path)
+    return file.read(run_path)
 end
 
 function m.is_empty()
     return next(setmetatable(m.get_table(), nil)) == nil
 end
 
-function m.get_command(name)
-    return m.get_table()[name]
-end
-
-function m.get_command(name)
-    return m.get_table()[name]
-end
-
 function m.run_command(name)
-    local cmd = m.get_command(name)
+    local cmd =m.get_table()[name]
     if cmd then
         vim.cmd(cmd)
         return true
@@ -40,35 +30,25 @@ function m.run_command(name)
     return false
 end
 
-function m.select_command(name)
-    local t = m.get_table()
-    local cmd = t[name]
-    if cmd then
-        t[selected] = cmd
-        t:write()
-        return true
-    end
-    return false
-end
-
+-- opens telescope ui select
 function m.menu_list(prompt, callback)
     if m.is_empty() then
         callback(nil)
-        return
+        return false
     end
 
     local t = m.get_table()
+    t.select = nil;
     local key_list = {}
     for name, _ in pairs(t) do
         table.insert(key_list, name)
     end
 
-    local result = false
     table.sort(key_list)
     vim.ui.select(key_list, {
         prompt = prompt,
         format_item = function(item)
-            return item .. " -> \"" .. m.get_command(item) .."\""
+            return item
         end,
     }, function(cmd_name)
         if cmd_name then
@@ -91,104 +71,51 @@ function m.create_command(name, command)
     t:write()
 end
 
-function m.remove_command(name)
-    local t = m.get_table()
-    if t[name] then
-        t[name] = nil
-        t:write()
-        return true
-    end
-    return false
-
-end
-
-
 function m.setup()
     vim.api.nvim_create_user_command("Run", function(args)
         -- 0 Arguments
         if #args.fargs == 0 then
-            if not m.run_command(selected) then
-                m.menu_list("Use :RunSet or Choose Commmand", function(name)
-                    if name then
-                        m.select_command(name)
-                    else
-                        m.menu_enter("Set Run command: ", function(cmd)
-                            m.create_command(selected, cmd)
-                        end)
+            local t = m.get_table();
+            if vim.uv.fs_stat(run_path) == nil then
+
+                -- === Ask to create a .neo file ===
+                vim.ui.select({"Create", "Cancel"}, {
+                    prompt = prompt,
+                }, function(choice)
+                    if choice == "Create" then
+                        local cmd = "lua vim.notify('Running example command')"
+                        local name = "example_command"
+                        t.select = name
+                        t[name] = cmd
+                        t:write()
+                        vim.notify(run_path .." Created")
                     end
                 end)
-            end
-        elseif #args.fargs == 1 then
-            local name = args.fargs[1]
-            if not m.run_command(name) then
-                print("Run command \"" .. name .."\" does not exists")
+                -- ================================
+
+            elseif t.select then
+                m.run_command(t.select)
             else
-                m.select_command(name)
+                vim.cmd("RunSelect")
             end
         end
     end, { nargs = "*" })
 
 
-    vim.api.nvim_create_user_command("RunSet", function(args)
-        -- 0 Arguments
-        if #args.fargs >= 1 then
-            local cmd = args.args
-            m.create_command(selected, cmd)
-            vim.notify("\rRun set to \""..cmd.."\" ")
-        else
-            m.menu_enter("Enter command: ", function(cmd)
-                m.create_command(selected, cmd)
-                vim.notify("\rRun set to \""..cmd.."\" ")
-            end)
-        end
-    end, { nargs = "*" })
+    vim.api.nvim_create_user_command("RunSelect", function(args)
 
-    vim.api.nvim_create_user_command("RunAdd", function(args)
-        -- 0 Arguments
-        if #args.fargs > 1 then
-            local name = args.fargs[1]
-            local cmd = table.concat(args.fargs, " ", 2)
-            m.create_command(name, cmd)
-            vim.notify("Run command \""..name.."\" added")
-        else
-            m.menu_enter("Enter name and command: ", function(out)
-                local name, cmd = (out):match("^(%S+)%s*(.*)$")
-                m.create_command(name, cmd)
-                vim.notify("\rRun command \""..name.."\" added")
-            end)
-        end
-    end, { nargs = "*" })
-
-
-    vim.api.nvim_create_user_command("RunRemove", function(args)
-        -- 0 Arguments
-        m.menu_list("Remove Command", function(name)
+        local not_empty = m.menu_list("Choose Command", function(name)
+            local t = m.get_table();
             if name then
-                m.remove_command(name)
-                vim.notify("Removed " ..name)
-            else
-                vim.notify("Run list is empty.")
+                t.select = name
+                vim.cmd(t[name]);
+                t:write();
             end
         end)
+        if not_empty == false then
+            vim.cmd("Run")
+        end
     end, { nargs = "*" })
-
-    vim.api.nvim_create_user_command("RunList", function(args)
-        m.menu_list("Choose Command", function(name)
-            if name then
-                m.select_command(name)
-                vim.notify("Selected " ..name)
-            else
-                vim.notify("Run list is empty. Use :RunAdd.")
-            end
-        end)
-    end, { nargs = "*" })
-
-    if key then
-        vim.keymap.set(key[1], key[2], function()
-            m.run_command(selected)
-        end)
-    end
-
 
 end
 
