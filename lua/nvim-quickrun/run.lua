@@ -5,7 +5,9 @@
 :RunAdd
 ```
 ]]
-local m = {}
+local m = {
+    select = nil
+}
 local file = require("nvim-quickrun.file_helpers")
 local run_path = require("nvim-quickrun").get_run_path()
 local key = require("nvim-quickrun").opts.key
@@ -86,7 +88,7 @@ function m.setup()
                     if choice == "Create" then
                         local cmd = "lua vim.notify('Running example command')"
                         local name = "example_command"
-                        t.select = name
+                        m.select = name
                         t[name] = cmd
                         t:write()
                         vim.notify(run_path .." Created")
@@ -95,8 +97,9 @@ function m.setup()
                 -- ================================
 
             -- check if select exist
-            elseif t.select then
-                m.run_command(t.select)
+            elseif t[m.select] ~= nil then
+                vim.cmd(t[m.select])
+                vim.notify("Quickrun: " .. m.select)
             else
                 vim.cmd("RunSelect")
             end
@@ -106,12 +109,18 @@ function m.setup()
 
     vim.api.nvim_create_user_command("RunSelect", function(args)
 
-        local not_empty = m.menu_list("Choose Command", function(name)
-            local t = m.get_table();
+        -- Get currently selected command
+        local current_select = "None"
+        local t = m.get_table();
+        if t[m.select] ~= nil then
+            current_select = m.select
+        end
+
+        local not_empty = m.menu_list("Current: " .. current_select, function(name)
             if name then
-                t.select = name
+                m.select = name
                 vim.cmd(t[name]);
-                t:write();
+                vim.notify("Quickrun: " .. name)
             end
         end)
         if not_empty == false then
