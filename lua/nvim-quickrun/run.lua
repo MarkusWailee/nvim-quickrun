@@ -38,7 +38,7 @@ function m.menu_list(prompt, callback)
     end
 
     local t = m.get_table()
-    t.select = nil;
+    t.select = nil; -- Just so select does not pop up as an option
     local key_list = {}
     for name, _ in pairs(t) do
         table.insert(key_list, name)
@@ -76,8 +76,9 @@ function m.setup()
         -- 0 Arguments
         if #args.fargs == 0 then
             local t = m.get_table();
+            -- Check if file path exist
             if vim.uv.fs_stat(run_path) == nil then
-
+                -- Create a default runner if no file exist
                 -- === Ask to create a .neo file ===
                 vim.ui.select({"Create", "Cancel"}, {
                     prompt = prompt,
@@ -93,6 +94,7 @@ function m.setup()
                 end)
                 -- ================================
 
+            -- check if select exist
             elseif t.select then
                 m.run_command(t.select)
             else
