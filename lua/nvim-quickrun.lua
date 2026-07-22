@@ -8,6 +8,9 @@ local m =
     }
 }
 
+function m.set_command(name)
+	require("nvim-quickrun.run").selected_cmd = name
+end
 m.get_run_path = function()
     return m.opts.file
 end
